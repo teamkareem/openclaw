@@ -1,9 +1,10 @@
 import { once } from "node:events";
 import type { Server } from "node:http";
 import { createConnection, type AddressInfo } from "node:net";
+import { brotliCompressSync } from "node:zlib";
 import express from "express";
 import { describe, expect, it } from "vitest";
-import { applyMSTeamsWebhookTimeouts } from "./monitor.js";
+import { applyMSTeamsWebhookTimeouts, rejectMSTeamsBrotliBody } from "./monitor.js";
 
 async function closeServer(server: Server): Promise<void> {
   await new Promise<void>((resolve) => {
@@ -78,6 +79,40 @@ describe("msteams monitor webhook hardening", () => {
       const port = (server.address() as AddressInfo).port;
       const closedMs = await waitForSlowBodySocketClose(port, 3000);
       expect(closedMs).toBeLessThan(2500);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  it("rejects brotli-encoded webhook bodies before JSON parsing", async () => {
+    const app = express();
+    app.use(rejectMSTeamsBrotliBody);
+    app.use(express.json({ limit: "1mb" }));
+    app.post("/api/messages", (req, res) => {
+      res.json({ type: (req.body as { type?: string }).type });
+    });
+
+    const server = app.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    try {
+      const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/messages`;
+      const body = '{"type":"message"}';
+      for (const encoding of ["br", "BR", "gzip, br"]) {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Content-Encoding": encoding },
+          body: encoding === "br" ? brotliCompressSync(body) : body,
+        });
+        expect(res.status).toBe(415);
+      }
+
+      const plain = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      expect(plain.status).toBe(200);
+      expect(await plain.json()).toEqual({ type: "message" });
     } finally {
       await closeServer(server);
     }

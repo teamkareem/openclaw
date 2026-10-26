@@ -62,6 +62,17 @@ export function applyMSTeamsWebhookTimeouts(
   httpServer.headersTimeout = headersTimeoutMs;
 }
 
+// body-parser 2.x inflates `br` bodies; refuse them so untrusted input never reaches the
+// Brotli decoder (CVE-2026-111497).
+export function rejectMSTeamsBrotliBody(req: Request, res: Response, next: () => void): void {
+  const encoding = req.headers["content-encoding"];
+  if (encoding && /(^|,)\s*br\s*(,|$)/i.test(encoding)) {
+    res.status(415).json({ error: "Unsupported Content-Encoding: br" });
+    return;
+  }
+  next();
+}
+
 export async function monitorMSTeamsProvider(
   opts: MonitorMSTeamsOpts,
 ): Promise<MonitorMSTeamsResult> {
@@ -269,6 +280,7 @@ export async function monitorMSTeamsProvider(
 
   // Create Express server
   const expressApp = express.default();
+  expressApp.use(rejectMSTeamsBrotliBody);
   expressApp.use(express.json({ limit: MSTEAMS_WEBHOOK_MAX_BODY_BYTES }));
   expressApp.use((err: unknown, _req: Request, res: Response, next: (err?: unknown) => void) => {
     if (err && typeof err === "object" && "status" in err && err.status === 413) {
