@@ -17,7 +17,6 @@ import {
   forceDisconnectPlaywrightForTarget,
   getPageForTargetId,
   storeRoleRefsForTarget,
-  type WithSnapshotForAI,
 } from "./pw-session.js";
 
 export async function snapshotAriaViaPlaywright(opts: {
@@ -56,16 +55,10 @@ export async function snapshotAiViaPlaywright(opts: {
   });
   ensurePageState(page);
 
-  const maybe = page as unknown as WithSnapshotForAI;
-  if (!maybe._snapshotForAI) {
-    throw new Error("Playwright _snapshotForAI is not available. Upgrade playwright-core.");
-  }
-
-  const result = await maybe._snapshotForAI({
+  let snapshot = await page.ariaSnapshot({
+    mode: "ai",
     timeout: Math.max(500, Math.min(60_000, Math.floor(opts.timeoutMs ?? 5000))),
-    track: "response",
   });
-  let snapshot = String(result?.full ?? "");
   const maxChars = opts.maxChars;
   const limit =
     typeof maxChars === "number" && Number.isFinite(maxChars) && maxChars > 0
@@ -110,15 +103,8 @@ export async function snapshotRoleViaPlaywright(opts: {
     if (opts.selector?.trim() || opts.frameSelector?.trim()) {
       throw new Error("refs=aria does not support selector/frame snapshots yet.");
     }
-    const maybe = page as unknown as WithSnapshotForAI;
-    if (!maybe._snapshotForAI) {
-      throw new Error("refs=aria requires Playwright _snapshotForAI support.");
-    }
-    const result = await maybe._snapshotForAI({
-      timeout: 5000,
-      track: "response",
-    });
-    const built = buildRoleSnapshotFromAiSnapshot(String(result?.full ?? ""), opts.options);
+    const aiSnapshot = await page.ariaSnapshot({ mode: "ai", timeout: 5000 });
+    const built = buildRoleSnapshotFromAiSnapshot(aiSnapshot, opts.options);
     storeRoleRefsForTarget({
       page,
       cdpUrl: opts.cdpUrl,

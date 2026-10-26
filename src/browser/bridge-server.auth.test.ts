@@ -1,3 +1,4 @@
+import { brotliCompressSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
 import { startBrowserBridgeServer, stopBrowserBridgeServer } from "./bridge-server.js";
 import type { ResolvedBrowserConfig } from "./config.js";
@@ -72,6 +73,25 @@ describe("startBrowserBridgeServer auth", () => {
       { authPassword: "secret-password" },
       { "x-openclaw-password": "secret-password" },
     );
+  });
+
+  it("rejects brotli-encoded request bodies with 415", async () => {
+    const bridge = await startBrowserBridgeServer({
+      resolved: buildResolvedConfig(),
+      authToken: "secret-token",
+    });
+    servers.push({ stop: () => stopBrowserBridgeServer(bridge.server) });
+
+    const res = await fetch(`${bridge.baseUrl}/`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer secret-token",
+        "Content-Type": "application/json",
+        "Content-Encoding": "br",
+      },
+      body: brotliCompressSync('{"ok":true}'),
+    });
+    expect(res.status).toBe(415);
   });
 
   it("requires auth params", async () => {

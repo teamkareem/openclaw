@@ -11,6 +11,9 @@ RUN apt-get update \
     jq \
     python3 \
     ripgrep \
+  && v="$(dpkg-query -W -f='${Version}' libbrotli1 2>/dev/null || true)" \
+  && { [ -z "$v" ] || dpkg --compare-versions "$v" ge 1.0.9-2+deb12u1 \
+    || { echo "ERROR: libbrotli1 $v is vulnerable to CVE-2026-111497" >&2; exit 1; }; } \
   && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --shell /bin/bash sandbox

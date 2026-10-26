@@ -1,4 +1,10 @@
-FROM node:22-bookworm@sha256:cd7bcd2e7a1e6f72052feb023c7f6b722205d3fcab7bbcbd2d1bfdab10b1e935
+FROM node:22-bookworm@sha256:63538dfe497cc29dfafdda25ada09b46db68a3f4cc205abf1f5d6bf0913f3384
+
+# Base ships vulnerable libbrotli1 (CVE-2026-111497); require the bookworm-security fix.
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --only-upgrade libbrotli1 libbrotli-dev \
+  && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge 1.0.9-2+deb12u1 \
+  && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable
 

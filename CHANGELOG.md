@@ -16,6 +16,7 @@ Docs: https://docs.openclaw.ai
 
 ### Fixes
 
+- Security/Brotli (CVE-2026-111497, GHSA-9v8h-qqgm-4m35): rebase Docker images on Node 22.23.4, pin Bun 1.4.4 in images and CI, require Node >=22.23.4 in CI, upgrade and verify Debian `libbrotli1` (>= 1.0.9-2+deb12u1) and sandbox `chromium` (>= 148) at image build, bump `playwright-core` to 1.64.1 (bundled Chromium 156; AI snapshots now use the public `page.ariaSnapshot({ mode: "ai" })`), and reject `Content-Encoding: br` request bodies with 415 on the browser control server and MS Teams webhook.
 - Agents/session usage tracking: preserve accumulated usage metadata on embedded Pi runner error exits so failed turns still update session `totalTokens` from real usage instead of stale prior values. (#34275) thanks @RealKai42.
 - Nodes/system.run approval hardening: use explicit argv-mutation signaling when regenerating prepared `rawCommand`, and cover the `system.run.prepare -> system.run` handoff so direct PATH-based `nodes.run` commands no longer fail with `rawCommand does not match command`. (#33137) thanks @Sid-Qin.
 - Models/custom provider headers: propagate `models.providers.<name>.headers` across inline, fallback, and registry-found model resolution so header-authenticated proxies consistently receive configured request headers. (#27490) thanks @Sid-Qin.

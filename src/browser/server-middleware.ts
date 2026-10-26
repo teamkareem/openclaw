@@ -17,6 +17,16 @@ export function installBrowserCommonMiddleware(app: Express) {
     (req as unknown as { signal?: AbortSignal }).signal = ctrl.signal;
     next();
   });
+  // body-parser 2.x inflates `br` bodies; refuse them so untrusted input never reaches the
+  // Brotli decoder (CVE-2026-111497).
+  app.use((req, res, next) => {
+    const encoding = req.headers["content-encoding"];
+    if (encoding && /(^|,)\s*br\s*(,|$)/i.test(encoding)) {
+      res.status(415).send("Unsupported Content-Encoding: br");
+      return;
+    }
+    next();
+  });
   app.use(express.json({ limit: "1mb" }));
   app.use(browserMutationGuardMiddleware());
 }
