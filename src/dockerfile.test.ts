@@ -28,6 +28,14 @@ describe("Dockerfile", () => {
     expect(dockerfile).toContain('find "$dir" -type f -exec chmod 644 {} +');
   });
 
+  it("pins Bun and requires the patched libbrotli1 (CVE-2026-111497)", async () => {
+    const dockerfile = await readFile(dockerfilePath, "utf8");
+    expect(dockerfile).toContain("ARG BUN_VERSION=1.4.4");
+    expect(dockerfile).toContain('bash -s "bun-v${BUN_VERSION}"');
+    expect(dockerfile).toContain("--only-upgrade");
+    expect(dockerfile).toContain('dpkg --compare-versions "$v" ge 1.0.9-2+deb12u1');
+  });
+
   it("Docker GPG fingerprint awk uses correct quoting for OPENCLAW_SANDBOX=1 build", async () => {
     const dockerfile = await readFile(dockerfilePath, "utf8");
     expect(dockerfile).toContain('== "fpr" {');

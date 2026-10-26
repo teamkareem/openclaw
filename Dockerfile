@@ -13,8 +13,22 @@ LABEL org.opencontainers.image.base.name="docker.io/library/node:22-bookworm" \
   org.opencontainers.image.title="OpenClaw" \
   org.opencontainers.image.description="OpenClaw gateway and CLI runtime container image"
 
+# The base image ships libbrotli1 1.0.9-2+b6, which is vulnerable to CVE-2026-111497;
+# pull the bookworm-security fix and fail the build if it is not present.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --only-upgrade \
+      libbrotli1 libbrotli-dev && \
+    v="$(dpkg-query -W -f='${Version}' libbrotli1)" && \
+    if ! dpkg --compare-versions "$v" ge 1.0.9-2+deb12u1; then \
+      echo "ERROR: libbrotli1 $v is vulnerable to CVE-2026-111497" >&2; \
+      exit 1; \
+    fi && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
 # Install Bun (required for build scripts)
-RUN curl -fsSL https://bun.sh/install | bash
+ARG BUN_VERSION=1.4.4
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
 ENV PATH="/root/.bun/bin:${PATH}"
 
 RUN corepack enable
