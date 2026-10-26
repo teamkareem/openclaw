@@ -11,7 +11,7 @@ type FakeSession = {
   detach: ReturnType<typeof vi.fn>;
 };
 
-function createPage(opts: { targetId: string; snapshotFull?: string; hasSnapshotForAI?: boolean }) {
+function createPage(opts: { targetId: string; snapshotFull?: string }) {
   const session: FakeSession = {
     send: vi.fn().mockResolvedValue({
       targetInfo: { targetId: opts.targetId },
@@ -28,18 +28,15 @@ function createPage(opts: { targetId: string; snapshotFull?: string; hasSnapshot
   const fill = vi.fn().mockResolvedValue(undefined);
   const locator = vi.fn().mockReturnValue({ click, dblclick, fill });
 
+  const ariaSnapshot = vi.fn().mockResolvedValue(opts.snapshotFull ?? "SNAP");
   const page = {
     context: () => context,
     locator,
     on: vi.fn(),
-    ...(opts.hasSnapshotForAI === false
-      ? {}
-      : {
-          _snapshotForAI: vi.fn().mockResolvedValue({ full: opts.snapshotFull ?? "SNAP" }),
-        }),
+    ariaSnapshot,
   };
 
-  return { page, session, locator, click, fill };
+  return { page, session, locator, click, fill, ariaSnapshot };
 }
 
 function createBrowser(pages: unknown[]) {
@@ -150,17 +147,18 @@ describe("pw-ai", () => {
     expect(p1.click).toHaveBeenCalledTimes(1);
   });
 
-  it("fails with a clear error when _snapshotForAI is missing", async () => {
-    const p1 = createPage({ targetId: "T1", hasSnapshotForAI: false });
+  it("requests an ai-mode aria snapshot with a clamped timeout", async () => {
+    const p1 = createPage({ targetId: "T1" });
     const browser = createBrowser([p1.page]);
     (chromiumMock.connectOverCDP as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(browser);
 
-    await expect(
-      snapshotAiViaPlaywright({
-        cdpUrl: "http://127.0.0.1:18792",
-        targetId: "T1",
-      }),
-    ).rejects.toThrow(/_snapshotForAI/i);
+    await snapshotAiViaPlaywright({
+      cdpUrl: "http://127.0.0.1:18792",
+      targetId: "T1",
+      timeoutMs: 120_000,
+    });
+
+    expect(p1.ariaSnapshot).toHaveBeenCalledWith({ mode: "ai", timeout: 60_000 });
   });
 
   it("reuses the CDP connection for repeated calls", async () => {
